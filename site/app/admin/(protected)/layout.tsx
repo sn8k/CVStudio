@@ -3,6 +3,8 @@ import { requireAdmin } from "@/lib/admin-session";
 import { SignOutButton } from "@/components/sign-out-button";
 import "../admin.css";
 
+export const dynamic = "force-dynamic";
+
 const links = [
   ["00", "Vue d’ensemble", "/admin"],
   ["01", "Identité", "/admin/profile"],
