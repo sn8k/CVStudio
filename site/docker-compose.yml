@@ -1,0 +1,54 @@
+services:
+  migrate:
+    build:
+      context: .
+      target: migrate
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: file:/app/data/cv.db
+    volumes:
+      - cv_data:/app/data
+    restart: "no"
+
+  app:
+    build:
+      context: .
+      target: runner
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: file:/app/data/cv.db
+      CV_UPLOAD_DIR: /app/data/cv-files
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+    ports:
+      - "${APP_BIND:-0.0.0.0}:${APP_PORT:-3000}:3000"
+    volumes:
+      - cv_data:/app/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  updater:
+    profiles: ["updates"]
+    build:
+      context: ./updater
+    environment:
+      UPDATE_SERVICE_TOKEN: ${UPDATE_SERVICE_TOKEN:-}
+      CVSTUDIO_GIT_REMOTE: ${CVSTUDIO_GIT_REMOTE:-https://github.com/sn8k/CVStudio.git}
+    volumes:
+      - ..:/repo
+      - /var/run/docker.sock:/var/run/docker.sock
+      - cv_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  cv_data:

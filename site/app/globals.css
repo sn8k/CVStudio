@@ -1,0 +1,42 @@
+@import "../styles.css";
+
+.preview-banner {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  min-height: 44px;
+  padding: 8px 20px;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: #f2c98a;
+  color: #16120a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.preview-banner a {
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.context-note {
+  position: relative;
+  z-index: 2;
+  margin-top: 16px !important;
+  font-size: 12px !important;
+}
+
+.experience-status {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 12px;
+  padding: 4px 8px;
+  border: 1px solid rgba(242, 201, 138, 0.35);
+  border-radius: 999px;
+  color: var(--warm);
+  font-family: ui-monospace, "Cascadia Code", monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+}

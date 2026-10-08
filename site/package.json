@@ -1,0 +1,53 @@
+{
+  "name": "cvstudio",
+  "version": "0.5.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test:smoke": "node scripts/smoke-test.mjs",
+    "test:contact": "tsx scripts/test-contact.mjs",
+    "test:settings": "tsx scripts/test-settings.mjs",
+    "test:themes": "tsx scripts/test-theme-resolver.ts && node scripts/test-theme-ui.mjs",
+    "test:pdf": "tsx scripts/test-pdf-management.ts",
+    "test:audience": "tsx scripts/test-audience.mjs",
+    "test:content-v5": "tsx scripts/test-content-v5.ts",
+    "test:backup-v5": "tsx scripts/test-backup-v5.ts",
+    "test:features-v5": "tsx scripts/test-features-v5.mjs",
+    "test:admin-ergonomics": "node scripts/admin-ergonomics-ui-test.mjs",
+    "db:generate": "prisma generate",
+    "db:init": "node scripts/init-db.mjs",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@better-auth/prisma-adapter": "1.7.5",
+    "@prisma/client": "6.19.3",
+    "better-auth": "1.7.5",
+    "dotenv": "17.2.3",
+    "next": "16.3.5",
+    "nodemailer": "10.0.10",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "@types/nodemailer": "8.0.2",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "eslint": "^9.39.0",
+    "eslint-config-next": "16.3.5",
+    "playwright-core": "^1.63.0",
+    "prisma": "6.19.3",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "deepmerge-ts": "8.0.0"
+  }
+}

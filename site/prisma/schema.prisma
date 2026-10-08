@@ -1,0 +1,503 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum LinkPlacement {
+  HOME
+  CONTACT
+  BOTH
+}
+
+enum ProjectDisplayMode {
+  PINNED
+  ROTATING
+  HIDDEN
+}
+
+enum DrivingLicenseStatus {
+  NOT_HELD
+  PLANNED
+  IN_PROGRESS
+  OBTAINED
+}
+
+enum CapabilityKind {
+  DOMAIN
+  TECHNOLOGY
+}
+
+enum ContentBlockType {
+  MISSIONS
+  ACHIEVEMENTS
+  CONTEXT
+  PROBLEMS
+  TOOLS
+  FREEFORM
+  LEGACY
+}
+
+enum ThemeSelectionMode {
+  AUTO
+  MANUAL
+}
+
+enum ThemeColorScheme {
+  LIGHT
+  DARK
+}
+
+enum ThemeBackgroundType {
+  DEFAULT
+  COLOR
+  GRADIENT
+}
+
+enum ThemeRuleKind {
+  TIME
+  CALENDAR
+}
+
+model Profile {
+  id                String   @id @default("main")
+  name              String
+  professionalTitle String
+  intro             String
+  profileHeading    String
+  profileLead       String
+  contactHeading    String
+  contactIntro      String
+  email             String
+  phoneDisplay      String
+  phoneHref         String
+  location          String
+  privateNotes      String?
+  updatedAt         DateTime @updatedAt
+}
+
+model Experience {
+  id            String              @id @default(cuid())
+  slug          String              @unique
+  period        String
+  startYear     Int
+  endYear       Int?
+  company       String
+  place         String
+  role          String
+  summary       String
+  accent        String              @default("#9fe7c3")
+  active        Boolean             @default(true)
+  status        ContentStatus       @default(DRAFT)
+  sortOrder     Int                 @default(0)
+  privateNotes  String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  sections      ExperienceSection[]
+  stages        ExperienceStage[]
+  contentBlocks ContentBlock[]
+  skills        ExperienceSkill[]
+  media         Media[]
+}
+
+model ExperienceStage {
+  id             String                 @id @default(cuid())
+  title          String
+  startDateLabel String?
+  endDateLabel   String?
+  description    String?
+  active         Boolean                @default(true)
+  sortOrder      Int                    @default(0)
+  privateNotes   String?
+  experienceId   String
+  experience     Experience             @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  skills         ExperienceStageSkill[]
+
+  @@index([experienceId, sortOrder])
+}
+
+model ContentBlock {
+  id           String              @id @default(cuid())
+  type         ContentBlockType    @default(FREEFORM)
+  title        String
+  body         String?
+  active       Boolean             @default(true)
+  sortOrder    Int                 @default(0)
+  privateNotes String?
+  experienceId String
+  experience   Experience          @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  items        ContentItem[]
+  skills       ContentBlockSkill[]
+
+  @@index([experienceId, sortOrder])
+}
+
+model ContentItem {
+  id           String             @id @default(cuid())
+  content      String
+  active       Boolean            @default(true)
+  sortOrder    Int                @default(0)
+  privateNotes String?
+  blockId      String
+  block        ContentBlock       @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  skills       ContentItemSkill[]
+
+  @@index([blockId, sortOrder])
+}
+
+model ExperienceSection {
+  id           String     @id @default(cuid())
+  title        String
+  sortOrder    Int        @default(0)
+  experienceId String
+  experience   Experience @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  missions     Mission[]
+}
+
+model Mission {
+  id        String            @id @default(cuid())
+  text      String
+  sortOrder Int               @default(0)
+  sectionId String
+  section   ExperienceSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+}
+
+model Skill {
+  id            String                 @id @default(cuid())
+  slug          String                 @unique
+  label         String
+  family        String
+  description   String
+  kind          CapabilityKind         @default(DOMAIN)
+  privateNotes  String?
+  active        Boolean                @default(true)
+  status        ContentStatus          @default(PUBLISHED)
+  sortOrder     Int                    @default(0)
+  experiences   ExperienceSkill[]
+  stages        ExperienceStageSkill[]
+  contentBlocks ContentBlockSkill[]
+  contentItems  ContentItemSkill[]
+  projects      ProjectSkill[]
+}
+
+model ExperienceSkill {
+  experienceId String
+  skillId      String
+  experience   Experience @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  skill        Skill      @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([experienceId, skillId])
+}
+
+model ExperienceStageSkill {
+  stageId String
+  skillId String
+  stage   ExperienceStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  skill   Skill           @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([stageId, skillId])
+}
+
+model ContentBlockSkill {
+  blockId String
+  skillId String
+  block   ContentBlock @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  skill   Skill        @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([blockId, skillId])
+}
+
+model ContentItemSkill {
+  itemId  String
+  skillId String
+  item    ContentItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  skill   Skill       @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, skillId])
+}
+
+model Education {
+  id           String        @id @default(cuid())
+  period       String
+  school       String
+  degree       String
+  active       Boolean       @default(true)
+  status       ContentStatus @default(PUBLISHED)
+  sortOrder    Int           @default(0)
+  privateNotes String?
+}
+
+model Language {
+  id           String        @id @default(cuid())
+  name         String
+  level        String
+  active       Boolean       @default(true)
+  status       ContentStatus @default(PUBLISHED)
+  sortOrder    Int           @default(0)
+  privateNotes String?
+}
+
+model Interest {
+  id           String        @id @default(cuid())
+  label        String
+  description  String?
+  active       Boolean       @default(true)
+  status       ContentStatus @default(PUBLISHED)
+  sortOrder    Int           @default(0)
+  privateNotes String?
+  media        Media[]
+}
+
+model DrivingLicense {
+  id                String               @id @default(cuid())
+  label             String               @unique
+  status            DrivingLicenseStatus @default(NOT_HELD)
+  note              String?
+  obtainedAt        DateTime?
+  active            Boolean              @default(true)
+  publicationStatus ContentStatus        @default(DRAFT)
+  sortOrder         Int                  @default(0)
+  privateNotes      String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+}
+
+model Project {
+  id           String             @id @default(cuid())
+  slug         String             @unique
+  title        String
+  summary      String
+  description  String?
+  active       Boolean            @default(false)
+  status       ContentStatus      @default(DRAFT)
+  displayMode  ProjectDisplayMode @default(ROTATING)
+  sortOrder    Int                @default(0)
+  privateNotes String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  media        Media[]
+  skills       ProjectSkill[]
+  links        ProjectLink[]
+}
+
+model ProjectLink {
+  id        String   @id @default(cuid())
+  projectId String
+  label     String
+  url       String
+  kind      String
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, sortOrder])
+}
+
+model ProjectSkill {
+  projectId String
+  skillId   String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  skill     Skill   @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, skillId])
+}
+
+model Link {
+  id           String        @id @default(cuid())
+  label        String
+  url          String
+  kind         String
+  placement    LinkPlacement @default(CONTACT)
+  active       Boolean       @default(true)
+  status       ContentStatus @default(DRAFT)
+  sortOrder    Int           @default(0)
+  privateNotes String?
+}
+
+model ExtraSection {
+  id           String        @id @default(cuid())
+  slug         String        @unique
+  eyebrow      String?
+  title        String
+  content      String
+  active       Boolean       @default(false)
+  status       ContentStatus @default(DRAFT)
+  sortOrder    Int           @default(0)
+  privateNotes String?
+}
+
+model Media {
+  id           String      @id @default(cuid())
+  kind         String
+  url          String
+  alt          String
+  caption      String?
+  sortOrder    Int         @default(0)
+  experienceId String?
+  projectId    String?
+  interestId   String?
+  experience   Experience? @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  project      Project?    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  interest     Interest?   @relation(fields: [interestId], references: [id], onDelete: Cascade)
+
+  @@index([interestId, kind, sortOrder])
+}
+
+model PublishedSnapshot {
+  id            String   @id @default(cuid())
+  schemaVersion Int      @default(1)
+  data          String
+  note          String?
+  createdAt     DateTime @default(now())
+}
+
+model PdfResume {
+  id           String   @id
+  originalName String
+  byteSize     Int
+  createdAt    DateTime @default(now())
+}
+
+model DailyPageView {
+  date           String   @id
+  views          Int      @default(0)
+  uniqueVisitors Int      @default(0)
+  updatedAt      DateTime @updatedAt
+}
+
+model SystemSettings {
+  id                         String              @id @default("main")
+  contactFormEnabled         Boolean?
+  smtpHost                   String?
+  smtpPort                   Int?
+  smtpSecure                 Boolean?
+  smtpUser                   String?
+  smtpPasswordEncrypted      String?
+  contactFromEmail           String?
+  contactFromName            String?
+  contactToEmail             String?
+  turnstileSiteKey           String?
+  turnstileSecretEncrypted   String?
+  audienceMeasurementEnabled Boolean?
+  themeMode                  ThemeSelectionMode?
+  defaultThemeSlug           String?
+  manualThemeSlug            String?
+  activePdfResumeId          String?
+  createdAt                  DateTime            @default(now())
+  updatedAt                  DateTime            @updatedAt
+}
+
+model VisualTheme {
+  id                 String              @id @default(cuid())
+  slug               String              @unique
+  name               String
+  active             Boolean             @default(true)
+  builtIn            Boolean             @default(false)
+  colorScheme        ThemeColorScheme    @default(DARK)
+  backgroundType     ThemeBackgroundType @default(COLOR)
+  backgroundColor    String
+  backgroundColorEnd String?
+  surfaceColor       String
+  surfaceAltColor    String
+  textColor          String
+  mutedColor         String
+  accentColor        String
+  sortOrder          Int                 @default(0)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  schedules          ThemeSchedule[]
+
+  @@index([active, sortOrder])
+}
+
+model ThemeSchedule {
+  id              String        @id @default(cuid())
+  name            String
+  active          Boolean       @default(true)
+  kind            ThemeRuleKind
+  themeSlug       String
+  startTime       String?
+  endTime         String?
+  startDate       String?
+  endDate         String?
+  recurringAnnual Boolean       @default(false)
+  priority        Int           @default(0)
+  sortOrder       Int           @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  theme           VisualTheme   @relation(fields: [themeSlug], references: [slug], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([active, kind, priority, sortOrder])
+  @@index([themeSlug])
+}
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
