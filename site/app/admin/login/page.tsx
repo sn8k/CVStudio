@@ -10,7 +10,7 @@ export default async function AdminLoginPage() {
   return (
     <main className="admin-login">
       <section className="admin-login-card" aria-labelledby="login-title">
-        <span className="brand-mark" aria-hidden="true">YG</span>
+        <span className="brand-mark" aria-hidden="true">CV</span>
         <h1 id="login-title">Administration privée</h1>
         <p>Connectez-vous pour modifier, prévisualiser et publier le CV.</p>
         <LoginForm />

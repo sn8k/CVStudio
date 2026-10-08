@@ -120,16 +120,6 @@ for attempt in $(seq 1 30); do
 done
 [[ "$healthy" == 1 ]] || { docker compose logs --no-color --tail=100 app; echo "Healthcheck en échec." >&2; exit 1; }
 
-token_line="$(grep '^UPDATE_SERVICE_TOKEN=' .env | tail -n 1 || true)"
-token_value="${token_line#*=}"
-token_value="${token_value#\"}"
-token_value="${token_value%\"}"
-token_value="${token_value#\'}"
-token_value="${token_value%\'}"
-if [[ "${#token_value}" -ge 32 && "$token_value" != CHANGE_ME* ]]; then
-  docker compose --profile updates up -d --no-deps --build updater
-fi
-
-docker compose --profile updates ps
+docker compose ps
 echo "Déploiement terminé : $(git -C "$REPO" rev-parse --short HEAD)"
 echo "Sauvegarde : $BACKUP_DIR"

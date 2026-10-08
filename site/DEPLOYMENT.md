@@ -25,7 +25,7 @@ Ce déploiement cible une instance unique de l’application avec SQLite sur un 
 
 Le service `migrate` exécute `prisma migrate deploy`, puis le bootstrap minimal. Sur une base vide, il crée le contenu initial, un premier snapshot et le compte administrateur. Sur une base déjà initialisée, il ne réinitialise pas le CV et ne modifie pas les snapshots.
 
-`ADMIN_PASSWORD` sert uniquement lors de la création initiale du compte correspondant à `ADMIN_EMAIL`. Le modifier ensuite dans `.env` ne change pas le mot de passe stocké. Ne changez pas non plus `ADMIN_EMAIL` après le bootstrap sans raison : une nouvelle adresse provoquerait la création d’un compte supplémentaire.
+`ADMIN_PASSWORD` sert uniquement lors de la création initiale du compte correspondant à `ADMIN_EMAIL`. Le modifier ensuite dans `.env` ne change pas le mot de passe stocké. `ADMIN_EMAIL` détermine aussi quel compte possède les droits d’administration ; une nouvelle adresse prive immédiatement l’ancienne de ces droits et peut créer un nouveau compte au prochain bootstrap. L’inscription publique est fermée.
 
 5. Se connecter à `/admin`, ouvrir **Sauvegarde**, puis importer l’export JSON V6 produit par l’administration locale. L’import remplace uniquement la version de travail du CV : il ne remplace ni les comptes Better Auth, ni les sessions, ni le snapshot public. Les exports V2, V3, V4 et V5 restent également importables.
 
@@ -43,7 +43,7 @@ La base de développement `prisma/dev.db` ne doit pas être copiée comme métho
 - `ADMIN_PASSWORD` : mot de passe initial unique, d’au moins 12 caractères.
 - `SETTINGS_ENCRYPTION_KEY` : clé maître de 32 octets encodée en base64, utilisée uniquement pour chiffrer les secrets administrables.
 - `APP_PORT` : port publié sur l’hôte.
-- `APP_BIND` : adresse d’écoute publiée, `0.0.0.0` par défaut.
+- `APP_BIND` : adresse d’écoute publiée, `127.0.0.1` par défaut. Un proxy hors de l’hôte exige une adresse adaptée et un pare-feu.
 - `AUDIENCE_MEASUREMENT_ENABLED` : interrupteur non secret, actif par défaut ; définir `false` pour couper pages vues et navigateurs quotidiens.
 
 ### Mesure d’audience locale
@@ -70,7 +70,7 @@ Le formulaire reste masqué tant que `CONTACT_FORM_ENABLED=true` et que ses conf
 - `TURNSTILE_SITE_KEY` : clé publique du widget Cloudflare Turnstile ;
 - `TURNSTILE_SECRET_KEY` : secret utilisé uniquement côté serveur pour Siteverify.
 
-Dans Cloudflare, créer un widget Turnstile en mode **Managed**, autoriser le domaine `ygcv.ygsoft.fr`, puis reporter ses deux clés réelles dans l’environnement du VPS. Ne jamais utiliser les clés officielles de test de `.env.example` en production et ne jamais committer le secret. L’application refuse explicitement ces clés de test en environnement de production.
+Dans Cloudflare, créer un widget Turnstile en mode **Managed**, autoriser votre domaine public, puis reporter ses deux clés réelles dans l’environnement du VPS. Ne jamais utiliser les clés officielles de test de `.env.example` en production et ne jamais committer le secret. L’application refuse explicitement ces clés de test en environnement de production.
 
 L’adresse saisie par le visiteur est placée dans `Reply-To`, jamais dans `From`, afin de préserver l’alignement SPF/DKIM/DMARC. Les messages sont transmis par e-mail et ne sont pas enregistrés dans SQLite. Le serveur valide chaque jeton auprès de Siteverify avec un délai maximal, contrôle le hostname et l’action attendus, et n’envoie pas l’adresse IP du visiteur à cette API. Une vérification absente, refusée ou indisponible bloque l’envoi SMTP avec un message générique.
 
@@ -108,21 +108,24 @@ La rotation de `SETTINGS_ENCRYPTION_KEY` n’est pas automatisée. Changer cette
 
 `ADMIN_PASSWORD` reste un secret de bootstrap uniquement. Le changement du mot de passe d’un compte existant s’effectue dans `/admin/settings` et reste entièrement géré par Better Auth.
 
-Pour un reverse proxy installé directement sur l’hôte, `APP_BIND=127.0.0.1` limite utilement l’exposition. Conserver `0.0.0.0` si le proxy doit joindre le port depuis une autre machine ou une topologie qui l’exige. Un proxy dans le même réseau Docker peut joindre directement le service `app` sur le port `3000`.
+Par défaut, le port publié n’écoute que sur `127.0.0.1` pour un reverse proxy installé sur l’hôte. Si le proxy doit joindre le port depuis une autre machine, adapter `APP_BIND` et limiter l’accès par pare-feu. Un proxy dans le même réseau Docker peut joindre directement le service `app` sur le port `3000`.
 
 ## Reverse proxy HTTPS
 
 Le proxy termine HTTPS et transmet vers le port HTTP interne `3000`. Il doit conserver `Host` et envoyer au minimum :
 
 - `X-Forwarded-Proto: https` ;
-- `X-Forwarded-For` avec l’adresse cliente ;
+- `X-Real-IP` avec l’adresse cliente, en remplaçant toute valeur reçue du navigateur ;
+- `X-Forwarded-For` reconstruit ou contrôlé par le proxy ;
 - le nom d’hôte public d’origine.
 
 Les valeurs de `BETTER_AUTH_URL` et `PUBLIC_SITE_URL` doivent correspondre exactement à cette origine HTTPS. Better Auth utilise alors des cookies sécurisés et valide cette origine. L’application actuelle ne nécessite pas de WebSocket dédié.
 
+L’application envoie HSTS et une politique CSP pour bloquer l’intégration en iframe, les objets, les changements de base d’URL et les formulaires vers d’autres origines. Le reverse proxy doit servir le site exclusivement en HTTPS pour que HSTS soit effectif.
+
 Le rate limiting Better Auth protège les routes d’authentification en production, mais sa mémoire est locale au processus. Ajouter également une limitation de débit sur `/admin/login` et `/api/auth/*` au niveau du reverse proxy ou du CDN pour une protection durable contre la force brute.
 
-Le formulaire applique aussi une limite légère en mémoire par client. Configurer en complément une limite au niveau du reverse proxy sur `POST /api/contact` (et remplacer, plutôt qu’ajouter aveuglément, `X-Forwarded-For`) afin de réduire le trafic abusif avant qu’il n’atteigne Node.js. Cette protection proxy reste nécessaire contre les volumes que le processus applicatif ne peut pas absorber seul.
+Le formulaire limite en mémoire les envois réussis (3), les tentatives par client (10) et toutes les tentatives confondues (120) sur 15 minutes. `X-Real-IP` est la seule adresse utilisée pour la limite par client ; sans en-tête fourni par un proxy de confiance, les visiteurs partagent cette limite. Configurer en complément une limite au niveau du reverse proxy sur `POST /api/contact` afin de réduire le trafic abusif avant qu’il n’atteigne Node.js. Cette protection proxy reste nécessaire contre les volumes que le processus applicatif ne peut pas absorber seul.
 
 ## Vérifications
 
@@ -163,17 +166,7 @@ Le script se détache de la session et écrit son journal dans `/var/log/cvstudi
 
 Lors d’une modification ultérieure du script lui-même, réexécuter la commande `install` après la mise à jour du dépôt pour remplacer la copie dans `/usr/local/sbin`.
 
-### Mise à jour depuis l’administration
-
-Cette option demande un serveur Linux avec Docker Compose, une copie Git propre du dépôt `https://github.com/sn8k/CVStudio.git` sur `main` (ou du dépôt défini par `CVSTUDIO_GIT_REMOTE`), et l’accès de l’administrateur au serveur pour l’installation initiale. Générer un jeton avec `openssl rand -hex 32`, l’inscrire comme `UPDATE_SERVICE_TOKEN` dans `site/.env`, puis démarrer le service interne :
-
-```bash
-docker compose --profile updates up -d --build
-```
-
-La page `/admin/settings` compare le commit de la copie locale avec GitHub. Le bouton crée d’abord une sauvegarde cohérente du volume complet et de `.env` dans `/opt/cv/backups/predeploy-*`, lance ensuite la récupération Git, un avancement sans fusion de `main`, puis la reconstruction et le redémarrage des services `migrate` et `app`. Recharger la page pour lire le résultat et le chemin de sauvegarde. Une copie modifiée localement ou divergente bloque l’opération ; résoudre la situation sur le serveur avant de réessayer. Une mise à jour de l’image du service `updater` lui-même se fait lors du prochain `docker compose --profile updates up -d --build updater`.
-
-Le profil `updates` monte le dépôt en écriture et le socket Docker dans le seul conteneur `updater`. Le socket donne le contrôle du moteur Docker sur l’hôte : protéger les accès à l’administration et à `.env`, ne pas exposer le port 8765, et conserver les sauvegardes produites hors du serveur. Sans ce profil ou sans jeton valide, l’administration signale simplement que le service est indisponible ; la procédure manuelle ci-dessus reste possible.
+Les mises à jour sont lancées depuis le serveur avec le script manuel ci-dessus. Les installations qui avaient activé le profil Compose `updates` doivent repérer l’ancien conteneur avec `docker ps --filter label=com.docker.compose.service=updater`, puis l’arrêter et le supprimer avec `docker rm -f <ID_DU_CONTENEUR>`. Cette opération ne touche pas au volume `cv_data`.
 
 ## Sauvegardes et restauration
 

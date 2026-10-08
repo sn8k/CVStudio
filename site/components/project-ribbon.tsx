@@ -150,7 +150,7 @@ function ProjectVisual({ project, eager }: { project: Project; eager: boolean })
   }
 
   const initials = project.title.split(/[\s+-]+/).filter(Boolean).slice(0, 3).map((part) => part[0]).join("").toUpperCase();
-  return <div className="content-card-visual project-visual project-visual-fallback" aria-hidden="true"><span>{initials || "YG"}</span><i /><i /></div>;
+  return <div className="content-card-visual project-visual project-visual-fallback" aria-hidden="true"><span>{initials || "CV"}</span><i /><i /></div>;
 }
 
 function paragraphs(value: string) {

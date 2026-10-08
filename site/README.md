@@ -36,7 +36,7 @@ Les modifications dans `/admin` sont des brouillons. Vérifiez-les dans l’aper
 
 La page `/admin/settings` configure le contact, SMTP, Turnstile, la mesure d’audience et les thèmes. `SETTINGS_ENCRYPTION_KEY` doit être une clé aléatoire de 32 octets encodés en base64 pour chiffrer les secrets enregistrés en base. Une valeur enregistrée dans l’administration prime sur sa variable d’environnement.
 
-Le service de mise à jour facultatif vérifie le remote Git avant tout téléchargement. Par défaut, il attend `https://github.com/sn8k/CVStudio.git` ; définissez `CVSTUDIO_GIT_REMOTE` dans `.env` pour votre propre dépôt. Le script manuel accepte la même variable. La branche attendue est `main`.
+La mise à jour se lance sur le serveur avec [`scripts/update-cvstudio.sh`](scripts/update-cvstudio.sh). Le script vérifie le dépôt Git avant de télécharger ; par défaut, il attend `https://github.com/sn8k/CVStudio.git`. Définissez `CVSTUDIO_GIT_REMOTE` pour votre propre dépôt. La branche attendue est `main`.
 
 ## Commandes utiles
 
@@ -58,6 +58,5 @@ Les autres commandes de test sont décrites dans `package.json`. Certains tests 
 - `lib/` : données, authentification et services ;
 - `prisma/` : schéma, migrations et contenu de démonstration ;
 - `scripts/` : initialisation, tests et mise à jour ;
-- `updater/` : service Docker optionnel de mise à jour.
 
 Les fichiers `.env`, bases SQLite, PDF, sauvegardes et notes locales sont exclus de Git. Le dossier `site/` est l’emplacement principal de l’application.

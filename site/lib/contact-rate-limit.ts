@@ -2,14 +2,17 @@ import { createHash } from "node:crypto";
 
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_SUCCESSFUL_MESSAGES = 3;
+const MAX_ATTEMPTS_PER_CLIENT = 10;
+const MAX_ATTEMPTS_GLOBAL = 120;
 const MAX_CLIENTS = 5000;
 
 type RateLimitStore = Map<string, number[]>;
-const globalRateLimit = globalThis as typeof globalThis & { contactRateLimitStore?: RateLimitStore };
-const store = globalRateLimit.contactRateLimitStore ?? new Map<string, number[]>();
-globalRateLimit.contactRateLimitStore = store;
+type ContactRateLimitState = { successful: RateLimitStore; attempts: RateLimitStore; totalAttempts: number[] };
+const globalRateLimit = globalThis as typeof globalThis & { contactRateLimitState?: ContactRateLimitState };
+const state: ContactRateLimitState = globalRateLimit.contactRateLimitState ?? { successful: new Map(), attempts: new Map(), totalAttempts: [] };
+globalRateLimit.contactRateLimitState = state;
 
-function cleanup(now: number) {
+function cleanupStore(store: RateLimitStore, now: number) {
   for (const [key, timestamps] of store) {
     const active = timestamps.filter((timestamp) => now - timestamp < WINDOW_MS);
     if (active.length === 0) store.delete(key);
@@ -22,26 +25,47 @@ function cleanup(now: number) {
   }
 }
 
+function cleanup(now: number) {
+  cleanupStore(state.successful, now);
+  cleanupStore(state.attempts, now);
+  state.totalAttempts = state.totalAttempts.filter((timestamp) => now - timestamp < WINDOW_MS);
+}
+
 export function getContactClientKey(headers: Headers) {
-  const forwarded = headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  const address = (forwarded || headers.get("x-real-ip")?.trim() || "unknown").slice(0, 200);
+  // X-Real-IP must be replaced by the trusted reverse proxy, never forwarded from the client.
+  const address = (headers.get("x-real-ip")?.trim() || "unknown").slice(0, 200);
   return createHash("sha256").update(`contact:${address}`).digest("hex");
+}
+
+function limitResult(timestamps: number[], limit: number, now: number) {
+  if (timestamps.length < limit) return { allowed: true, retryAfterSeconds: 0 };
+  return { allowed: false, retryAfterSeconds: Math.max(1, Math.ceil((WINDOW_MS - (now - timestamps[0])) / 1000)) };
+}
+
+export function consumeContactAttempt(clientKey: string, now = Date.now()) {
+  cleanup(now);
+  const clientAttempts = state.attempts.get(clientKey) ?? [];
+  const globalLimit = limitResult(state.totalAttempts, MAX_ATTEMPTS_GLOBAL, now);
+  const clientLimit = limitResult(clientAttempts, MAX_ATTEMPTS_PER_CLIENT, now);
+  if (!globalLimit.allowed) return globalLimit;
+  if (!clientLimit.allowed) return clientLimit;
+  state.attempts.set(clientKey, [...clientAttempts, now]);
+  state.totalAttempts.push(now);
+  return { allowed: true, retryAfterSeconds: 0 };
 }
 
 export function checkContactRateLimit(clientKey: string, now = Date.now()) {
   cleanup(now);
-  const timestamps = store.get(clientKey) ?? [];
-  if (timestamps.length < MAX_SUCCESSFUL_MESSAGES) return { allowed: true, retryAfterSeconds: 0 };
-  const retryAfterSeconds = Math.max(1, Math.ceil((WINDOW_MS - (now - timestamps[0])) / 1000));
-  return { allowed: false, retryAfterSeconds };
+  return limitResult(state.successful.get(clientKey) ?? [], MAX_SUCCESSFUL_MESSAGES, now);
 }
 
 export function recordSuccessfulContact(clientKey: string, now = Date.now()) {
   cleanup(now);
-  store.set(clientKey, [...(store.get(clientKey) ?? []), now]);
+  state.successful.set(clientKey, [...(state.successful.get(clientKey) ?? []), now]);
 }
 
 export function resetContactRateLimitForTests() {
-  store.clear();
+  state.successful.clear();
+  state.attempts.clear();
+  state.totalAttempts = [];
 }
-

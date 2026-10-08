@@ -32,7 +32,7 @@ export async function sendContactMessage(config: ContactConfig, message: Contact
   const { transporter, testMode } = createContactTransport(config);
   const subject = `Nouveau message depuis le CV — ${message.name}`;
   const text = [
-    "Nouveau message reçu depuis ygcv.ygsoft.fr",
+    "Nouveau message reçu depuis le formulaire de contact CVStudio",
     "",
     "Nom :",
     message.name,

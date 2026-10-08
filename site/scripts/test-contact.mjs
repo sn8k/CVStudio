@@ -47,7 +47,8 @@ function contactRequest(data, { ip = "198.51.100.10", origin = baseURL, accept =
       Accept: accept,
       "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
       Origin: origin,
-      "X-Forwarded-For": ip,
+      "X-Real-IP": ip,
+      "X-Forwarded-For": "203.0.113.99",
     },
     body: new URLSearchParams(data),
   });
@@ -246,7 +247,26 @@ const limitedResponse = await contactPost(contactRequest(validMessage, { ip: "19
 assert.equal(limitedResponse.status, 429);
 assert(Number(limitedResponse.headers.get("retry-after")) > 0);
 assert.equal(getContactTestDeliveries().length, 3, "Un e-mail supplémentaire a été envoyé après le seuil.");
-assert.equal(verificationCalls, 0, "Le rate limit dépassé a appelé Siteverify.");
+  assert.equal(verificationCalls, 0, "Le rate limit dépassé a appelé Siteverify.");
+
+resetContactRateLimitForTests();
+verificationCalls = 0;
+for (let attempt = 0; attempt < 10; attempt += 1) {
+  const response = await contactPost(contactRequest({ ...validMessage, "cf-turnstile-response": "" }, { ip: "198.51.100.42" }), countedVerification);
+  assert.equal(response.status, 400, `La tentative invalide ${attempt + 1} a été refusée trop tôt.`);
+}
+const attemptLimitedResponse = await contactPost(contactRequest(validMessage, { ip: "198.51.100.42" }), countedVerification);
+assert.equal(attemptLimitedResponse.status, 429, "Les tentatives sans succès ne sont pas limitées.");
+assert.equal(verificationCalls, 0, "Une tentative limitée a appelé Siteverify.");
+
+resetContactRateLimitForTests();
+for (let attempt = 0; attempt < 120; attempt += 1) {
+  const response = await contactPost(contactRequest({ ...validMessage, "cf-turnstile-response": "" }, { ip: `198.51.100.${attempt}` }), countedVerification);
+  assert.equal(response.status, 400, `La tentative globale ${attempt + 1} a été refusée trop tôt.`);
+}
+const globallyLimitedResponse = await contactPost(contactRequest(validMessage, { ip: "203.0.113.200" }), countedVerification);
+assert.equal(globallyLimitedResponse.status, 429, "Changer d’adresse annoncée contourne la limite globale.");
+resetContactRateLimitForTests();
 
 const configuredSmtpHost = process.env.CONTACT_SMTP_HOST;
 delete process.env.CONTACT_SMTP_HOST;
@@ -445,7 +465,7 @@ try {
   await context.close();
 
   assert.equal(browserErrors.length, 0, browserErrors.join(" | "));
-  console.log(JSON.stringify({ validation: "name email message limits", bodyLimit: "64 KiB", honeypot: "neutral without Siteverify or delivery", turnstile: "required invalid duplicate network timeout valid", officialTestKeys: "always-pass always-fail duplicate", smtpTestTransport: "json from reply-to content", rateLimit: "3 successful messages per 15 minutes", origin: "checked", disabledConfiguration: "hidden and 503", ui: "managed widget success reset error", preview: "visible disabled without Turnstile request", noJavaScript: "blocked with mailto fallback", responsive: "390px no overflow", keyboard: "fields widget button focus", screenshots: 6 }));
+  console.log(JSON.stringify({ validation: "name email message limits", bodyLimit: "64 KiB", honeypot: "neutral without Siteverify or delivery", turnstile: "required invalid duplicate network timeout valid", officialTestKeys: "always-pass always-fail duplicate", smtpTestTransport: "json from reply-to content", rateLimit: "3 successful and 10 attempted messages per client; 120 global attempts per 15 minutes", origin: "checked", disabledConfiguration: "hidden and 503", ui: "managed widget success reset error", preview: "visible disabled without Turnstile request", noJavaScript: "blocked with mailto fallback", responsive: "390px no overflow", keyboard: "fields widget button focus", screenshots: 6 }));
 } finally {
   if (stopServer) await stopServer();
   await browser.close();

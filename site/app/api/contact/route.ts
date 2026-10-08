@@ -1,6 +1,6 @@
 import { getContactFormConfig } from "@/lib/contact-config";
 import { sendContactMessage } from "@/lib/contact-mailer";
-import { checkContactRateLimit, getContactClientKey, recordSuccessfulContact } from "@/lib/contact-rate-limit";
+import { checkContactRateLimit, consumeContactAttempt, getContactClientKey, recordSuccessfulContact } from "@/lib/contact-rate-limit";
 import { CONTACT_MAX_BODY_BYTES, contactFormSchema, getContactFieldErrors } from "@/lib/contact-schema";
 import { contactFeedback, type ContactStatus } from "@/lib/contact-types";
 import { verifyTurnstileToken } from "@/lib/turnstile";
@@ -109,6 +109,12 @@ export async function handleContactRequest(request: Request, dependencies: Conta
     return contactResponse(request, { ok: false, code: "NOT_CONFIGURED", message: contactFeedback.unavailable }, 503, "unavailable");
   }
 
+  const clientKey = getContactClientKey(request.headers);
+  const attemptLimit = consumeContactAttempt(clientKey);
+  if (!attemptLimit.allowed) {
+    return contactResponse(request, { ok: false, code: "RATE_LIMITED", message: contactFeedback["rate-limited"] }, 429, "rate-limited", { "Retry-After": String(attemptLimit.retryAfterSeconds) });
+  }
+
   let payload: unknown;
   try {
     payload = await readPayload(request);
@@ -127,7 +133,6 @@ export async function handleContactRequest(request: Request, dependencies: Conta
     return contactResponse(request, { ok: false, code: "VALIDATION_ERROR", message: contactFeedback.invalid, errors: getContactFieldErrors(parsed.error) }, 400, "invalid");
   }
 
-  const clientKey = getContactClientKey(request.headers);
   const rateLimit = checkContactRateLimit(clientKey);
   if (!rateLimit.allowed) {
     return contactResponse(request, { ok: false, code: "RATE_LIMITED", message: contactFeedback["rate-limited"] }, 429, "rate-limited", { "Retry-After": String(rateLimit.retryAfterSeconds) });

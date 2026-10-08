@@ -4,9 +4,7 @@ import { ThemeSettings } from "@/components/theme-settings";
 import { requireAdmin } from "@/lib/admin-session";
 import { getEffectiveSystemSettings } from "@/lib/system-settings";
 import { getVisualThemeCatalog, resolveConfiguredVisualTheme } from "@/lib/visual-theme-data";
-import { getGithubUpdateStatus } from "@/lib/github-update";
 import packageMetadata from "@/package.json";
-import { updateFromGithubAction } from "./update-action";
 
 function stateLabel(value: boolean, enabled = "Activé", disabled = "Désactivé") {
   return value ? enabled : disabled;
@@ -22,7 +20,7 @@ function themeReasonLabel(reason: string) {
 
 export default async function AdminSettingsPage() {
   await requireAdmin();
-  const [settings, themeCatalog, updateStatus] = await Promise.all([getEffectiveSystemSettings(), getVisualThemeCatalog(), getGithubUpdateStatus()]);
+  const [settings, themeCatalog] = await Promise.all([getEffectiveSystemSettings(), getVisualThemeCatalog()]);
   const resolvedTheme = resolveConfiguredVisualTheme(settings.raw, themeCatalog);
   const publicUrl = process.env.PUBLIC_SITE_URL ?? "Non configurée";
   return <>
@@ -70,16 +68,10 @@ export default async function AdminSettingsPage() {
       <PasswordSettingsForm />
     </section>
 
-    <div className="settings-section-heading"><p className="admin-kicker">D · Logiciel</p><h2>Mise à jour depuis GitHub</h2></div>
+    <div className="settings-section-heading"><p className="admin-kicker">D · Logiciel</p><h2>Version installée</h2></div>
     <section className="admin-panel settings-panel" aria-labelledby="settings-update-title">
       <h2 id="settings-update-title">CV Studio {packageMetadata.version}</h2>
-      {updateStatus ? <>
-        <p className="admin-notice">{updateStatus.message}</p>
-        <p>Copie du serveur : <code>{updateStatus.localCommit.slice(0, 8)}</code> · GitHub main : <code>{updateStatus.remoteCommit.slice(0, 8)}</code></p>
-        {updateStatus.updatedAt && <p>Dernière opération : {new Date(updateStatus.updatedAt).toLocaleString("fr-FR")}</p>}
-        <form action={updateFromGithubAction}><button className="admin-button admin-button-primary" type="submit" disabled={updateStatus.state === "running" || (updateStatus.localCommit === updateStatus.remoteCommit && updateStatus.state !== "error")}>Mettre à jour depuis GitHub</button></form>
-        {updateStatus.state === "running" && <p>Rechargez cette page pour suivre la progression.</p>}
-      </> : <p className="admin-notice">Service de mise à jour indisponible. Activez le profil Docker Compose « updates » et configurez son jeton partagé.</p>}
+      <p className="admin-notice">Les mises à jour sont réalisées par l’exploitant depuis le serveur, avec une sauvegarde préalable du volume et de la configuration.</p>
     </section>
 
     <div className="settings-section-heading"><p className="admin-kicker">E · État système</p><h2>Diagnostic non sensible</h2></div>
